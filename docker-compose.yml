@@ -5,31 +5,51 @@ services:
     image: jplock/zookeeper:3.4.13
     ports:
       - "2181:2181"
+    networks:
+      - my_net
   solr1:
     build: solr-kerberos
     ports:
       - "18983:8983"
       - "4000:4000"
+    hostname: solr1
+    networks:
+      - "my_net"
     volumes:
       - ./wait-for-it.sh:/usr/bin/wait-for-it.sh
       - ./keytabs:/tmp/keytabs-tmp
       - ./krb5.conf:/etc/krb5.conf
       - ./jaas-client.conf:/tmp/tmp-jaas.conf
       - ./security.json:/tmp/security.json
-#      - ./solr-core-8.1.2-SNAPSHOT.jar:/opt/solr-8.1.1/dist/solr-core-8.1.1.jar
-#      - ./solr-core-8.1.2-SNAPSHOT.jar:/opt/solr-8.1.1/server/solr-webapp/webapp/WEB-INF/lib/solr-core-8.1.1.jar
+      - ./log4j2.xml:/tmp/log4j2.xml
     command: >
       /bin/bash -c 'cp /tmp/tmp-jaas.conf /tmp/jaas-client.conf 
       && cp /tmp/keytabs-tmp /tmp/keytabs
       && chmod 777 /tmp/keytabs
-      && export SOLR_AUTH_TYPE="kerberos"
-      && export SOLR_AUTHENTICATION_OPTS="-DauthenticationPlugin=org.apache.solr.security.KerberosPlugin -Djava.security.auth.login.config=/tmp/jaas-client.conf -Dsolr.kerberos.cookie.domain=solr1 -Dsolr.kerberos.cookie.portaware=true -Dsolr.kerberos.principal=HTTP/solr1@EXAMPLE.COM -Dsolr.kerberos.keytab=/tmp/keytabs -Dsolr.kerberos.jaas.appname=SolrClient"
-      && sed -i "s/HOSTNAME/solr1/g" /tmp/jaas-client.conf 
-      && /usr/bin/wait-for-it.sh -h zk1 -p 2181 -t 0 
+      && sed -i "s/HOSTNAME/solr1/g" /tmp/jaas-client.conf
+      && /usr/bin/wait-for-it.sh -h zk1 -p 2181 -t 0
       && sh server/scripts/cloud-scripts/zkcli.sh -z zk1:2181 -cmd putfile /security.json /tmp/security.json
-      && /opt/solr/bin/solr -c -f -a "-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=4000,suspend=n" -Dhost=solr1 -z zk1:2181'
+      && /opt/solr/bin/solr -c -f -a "-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=4000,suspend=n" -z zk1:2181 \
+        -Dhost=solr1 \
+        -Dsun.security.krb5.debug=true \
+        -Dsun.security.krb5.rcache=none \
+        -Dhadoopauth.tracehttp=true \
+        -Dlog4j.configurationFile=file:///tmp/log4j2.xml \
+        -Djava.security.auth.login.config=/tmp/jaas-client.conf \
+        -Dsolr.kerberos.principal=HTTP/solr1@EXAMPLE.COM \
+        -Dsolr.kerberos.keytab=/tmp/keytabs \
+        -Dsolr.kerberos.jaas.appname=SolrClient \
+        -Dsolr.authentication.kerberos.principal=HTTP/solr1@EXAMPLE.COM \
+        -Dsolr.authentication.kerberos.keytab=/tmp/keytabs \
+        -Dsolr.authentication.multi-scheme-auth-handler.delegation.schemes=negotiate \
+        -Dsolr.authentication.multi-scheme-auth-handler.schemes.negotiate.handler=kerberos \
+        -Dsolr.authentication.type="multi-scheme" \
+        -Dsolr.authentication.multi-scheme-auth-handler.schemes=negotiate'
   solr2:
     build: solr-kerberos
+    hostname: solr2
+    networks:
+      - my_net
     ports:
       - "5000:4000"
     volumes:
@@ -37,17 +57,82 @@ services:
       - ./keytabs:/tmp/keytabs-tmp
       - ./krb5.conf:/etc/krb5.conf
       - ./jaas-client.conf:/tmp/tmp-jaas.conf
-#      - ./solr-core-8.1.2-SNAPSHOT.jar:/opt/solr-8.1.1/dist/solr-core-8.1.1.jar
-#      - ./solr-core-8.1.2-SNAPSHOT.jar:/opt/solr-8.1.1/server/solr-webapp/webapp/WEB-INF/lib/solr-core-8.1.1.jar
+      - ./log4j2.xml:/tmp/log4j2.xml
     command: >
       /bin/bash -c 'cp /tmp/tmp-jaas.conf /tmp/jaas-client.conf 
       && cp /tmp/keytabs-tmp /tmp/keytabs
       && chmod 777 /tmp/keytabs
-      && export SOLR_AUTH_TYPE="kerberos"
-      && export SOLR_AUTHENTICATION_OPTS="-DauthenticationPlugin=org.apache.solr.security.KerberosPlugin -Djava.security.auth.login.config=/tmp/jaas-client.conf -Dsolr.kerberos.cookie.domain=solr2 -Dsolr.kerberos.cookie.portaware=true -Dsolr.kerberos.principal=HTTP/solr2@EXAMPLE.COM -Dsolr.kerberos.keytab=/tmp/keytabs -Dsolr.kerberos.jaas.appname=SolrClient"
-      && sed -i "s/HOSTNAME/solr2/g" /tmp/jaas-client.conf 
-      && /usr/bin/wait-for-it.sh -h zk1 -p 2181 -t 0 
-      && /opt/solr/bin/solr -c -f -a "-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=4000,suspend=n" -Dhost=solr2 -z zk1:2181'
+      && sed -i "s/HOSTNAME/solr2/g" /tmp/jaas-client.conf
+      && /usr/bin/wait-for-it.sh -h zk1 -p 2181 -t 0
+      && /opt/solr/bin/solr -c -f -a "-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=4000,suspend=n" -z zk1:2181 \
+             -Dhost=solr2 \
+             -Dsun.security.krb5.debug=true \
+             -Dsun.security.krb5.rcache=none \
+             -Dhadoopauth.tracehttp=true \
+             -Dlog4j.configurationFile=file:///tmp/log4j2.xml \
+             -Djava.security.auth.login.config=/tmp/jaas-client.conf \
+             -Dsolr.kerberos.principal=HTTP/solr2@EXAMPLE.COM \
+             -Dsolr.kerberos.keytab=/tmp/keytabs \
+             -Dsolr.kerberos.jaas.appname=SolrClient \
+             -Dsolr.authentication.kerberos.principal=HTTP/solr2@EXAMPLE.COM \
+             -Dsolr.authentication.kerberos.keytab=/tmp/keytabs \
+             -Dsolr.authentication.multi-scheme-auth-handler.delegation.schemes=negotiate \
+             -Dsolr.authentication.multi-scheme-auth-handler.schemes.negotiate.handler=kerberos \
+             -Dsolr.authentication.type="multi-scheme" \
+             -Dsolr.authentication.multi-scheme-auth-handler.schemes=negotiate'
+  solr3:
+    build: solr-kerberos
+    hostname: solr3
+    networks:
+      - my_net
+    ports:
+      - "6000:4000"
+    volumes:
+      - ./service_kts:/tmp/service_kts/
+      - ./wait-for-it.sh:/usr/bin/wait-for-it.sh
+      - ./krb5.conf:/etc/krb5.conf
+      - ./jaas-client.conf:/tmp/tmp-jaas.conf
+      - ./log4j2.xml:/tmp/log4j2.xml
+    command: >
+      /bin/bash -c 'cp /tmp/tmp-jaas.conf /tmp/jaas-client.conf
+      && sed -i "s/HOSTNAME/solr3/g" /tmp/jaas-client.conf
+      && sed -i "s/\/keytabs/\/service_kts\/solr3.keytab/1" /tmp/jaas-client.conf
+      && /usr/bin/wait-for-it.sh -h zk1 -p 2181 -t 0
+      && /opt/solr/bin/solr -c -f -a "-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=4000,suspend=n" -z zk1:2181 \
+             -Dhost=solr3 \
+             -Dsun.security.krb5.debug=true \
+             -Dsun.security.krb5.rcache=none \
+             -Dhadoopauth.tracehttp=true \
+             -Dlog4j.configurationFile=file:///tmp/log4j2.xml \
+             -Djava.security.auth.login.config=/tmp/jaas-client.conf \
+             -Dsolr.kerberos.principal=HTTP/solr3@EXAMPLE.COM \
+             -Dsolr.kerberos.keytab=/tmp/service_kts/solr3.keytab \
+             -Dsolr.kerberos.jaas.appname=SolrClient \
+             -Dsolr.authentication.kerberos.principal=HTTP/solr3@EXAMPLE.COM \
+             -Dsolr.authentication.kerberos.keytab=/tmp/service_kts/solr3.keytab \
+             -Dsolr.authentication.multi-scheme-auth-handler.delegation.schemes=negotiate \
+             -Dsolr.authentication.multi-scheme-auth-handler.schemes.negotiate.handler=kerberos \
+             -Dsolr.authentication.type="multi-scheme" \
+             -Dsolr.authentication.multi-scheme-auth-handler.schemes=negotiate'
   kdc:
+    hostname: kdc
+    networks:
+      - my_net
+    volumes:
+      - ./service_kts:/tmp/service_kts/
     image: kdc
-    command: /bin/bash -c "service krb5-kdc start; service krb5-admin-server start; service ssh start; tail -f /dev/null"
+    ports:
+      - "88:88"
+      - "749:749"
+    command: /bin/bash -c 'service krb5-kdc start;
+      service krb5-admin-server start;
+      service ssh start;
+      echo "addprinc -pw restrict client2@EXAMPLE.COM" | kadmin.local;
+      echo "addprinc -pw solr3 HTTP/solr3@EXAMPLE.COM" | kadmin.local;
+      [ -f /tmp/service_kst/solr3.keytab ] && rm -f /tmp/service_kst/solr3.keytab;
+      echo "xst -k /tmp/service_kts/solr3.keytab HTTP/solr3@EXAMPLE.COM" | kadmin.local;
+      chmod 777 /tmp/service_kts/solr3.keytab;
+      tail -f /dev/null'
+
+networks:
+  my_net:

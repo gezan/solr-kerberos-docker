@@ -1,0 +1,23 @@
+<Configuration>
+    <Appenders>
+
+        <Console name="STDOUT" target="SYSTEM_OUT">
+            <PatternLayout>
+                <Pattern>
+                    %maxLen{%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%X{collection} %X{shard} %X{replica} %X{core}] %c{1.} %m%notEmpty{ =>%ex{short}}}{10240}%n
+                </Pattern>
+            </PatternLayout>
+        </Console>
+
+    </Appenders>
+    <Loggers>
+        <AsyncLogger name="org.apache.hadoop" level="debug"/>
+        <AsyncLogger name="org.apache.hadoop.security" level="trace"/>
+        <AsyncLogger name="org.apache.solr.update.LoggingInfoStream" level="off"/>
+        <AsyncLogger name="org.apache.zookeeper" level="warn"/>
+
+        <AsyncRoot level="info">
+            <AppenderRef ref="STDOUT"/>
+        </AsyncRoot>
+    </Loggers>
+</Configuration>

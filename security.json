@@ -1,28 +1,63 @@
 {
- "authentication": {"class": "org.apache.solr.security.KerberosPlugin"},
+  "authentication": {
+    "class": "org.apache.solr.security.ConfigurableInternodeAuthHadoopPlugin",
+    "clientBuilderFactory": "org.apache.solr.client.solrj.impl.Krb5HttpClientBuilder",
+    "sysPropPrefix": "solr.authentication.",
+    "type": "multi-scheme",
+    "initKerberosZk": "true",
+    "enableDelegationToken":"true",
+    "authConfigs": [
+      "multi-scheme-auth-handler.schemes",
+      "multi-scheme-auth-handler.schemes.basic.handler",
+      "multi-scheme-auth-handler.schemes.negotiate.handler",
+      "multi-scheme-auth-handler.delegation.schemes",
+      "kerberos.principal",
+      "kerberos.keytab",
+      "kerberos.name.rules",
+      "ldap.providerurl",
+      "ldap.basedn",
+      "ldap.binddomain",
+      "ldap.enablestarttls",
+      "cookie.domain",
+      "delegation-token.token-kind",
+      "delegation-token.update-interval.sec",
+      "delegation-token.max-lifetime.sec",
+      "delegation-token.renewal-interval.sec",
+      "delegation-token.removal-scan-interval.sec",
+      "signer.secret.provider",
+      "zk-dt-secret-manager.enable",
+      "zk-dt-secret-manager.znodeWorkingPath",
+      "signer.secret.provider.zookeeper.path"
+    ],
+    "defaultConfigs": {
+      "delegation-token.token-kind": "solr-dt",
+      "signer.secret.provider": "zookeeper",
+      "zk-dt-secret-manager.enable": "true",
+      "token.validity": "36000",
+      "zk-dt-secret-manager.znodeWorkingPath": "security/zkdtsm",
+      "signer.secret.provider.zookeeper.path": "/token",
+      "kerberos.name.rules": "RULE:[1:$1@$0](HTTP.*@EXAMPLE.COM$)s/@EXAMPLE.COM$//RULE:[1:$1@$0](.*@EXAMPLE.COM$)s/@EXAMPLE.COM$///LRULE:[2:$1@$0](HTTP.*@EXAMPLE.COM$)s/@EXAMPLE.COM$//RULE:[2:$1@$0](.*@EXAMPLE.COM$)s/@EXAMPLE.COM$///LDEFAULT"
+    }
+  },
  "authorization": {
    "class": "solr.RuleBasedAuthorizationPlugin",
    "permissions": [
      {
-       "name": "read",
-       "role": "*"
-     },
-     {
-       "name": "update",
-       "role": [
-         "indexer",
-         "admin"
-       ]
-     },
-     {
        "name": "all",
        "role": "admin"
+     },
+     {
+       "name": "read",
+       "collection": "test",
+       "role": "restricted"
      }
    ],
    "user-role": {
      "HTTP/solr1@EXAMPLE.COM": "admin",
      "HTTP/solr2@EXAMPLE.COM": "admin",
-     "client@EXAMPLE.COM": "indexer"
+     "HTTP/solr3@EXAMPLE.COM": "admin",
+     "client@EXAMPLE.COM": "admin",
+     "client2@EXAMPLE.COM": "restricted"
    }
  }
 }

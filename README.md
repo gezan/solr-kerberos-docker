@@ -122,3 +122,51 @@ Open Firefox, and goto "about:config". Configure "network.negotiate-auth.delegat
 
 
 Now, access http://solr1:8983/solr and the Solr Admin UI should show up.
+
+
+SOLR-15233 Reproduction
+----------------------------------
+
+JIRA link: https://issues.apache.org/jira/browse/SOLR-15233
+
+This could be presented with a 2-node solrcloud but with this the distributed requests amongst the replicas can be checked as well so I added another solr service to have 3 nodes.
+
+#### Steps:
+1) Start the docker services
+    ```
+    docker-compose-up
+    ```
+2) Create a collection with client@EXAMPLE.COM. Collection name shall differ from 'test' and have exactly 2 replicas on 2 different nodes:<br />
+    ```shell script
+    kinit client@EXAMPLE.COM
+    curl -i --negotiate -u : 'http://solr1:8983/solr/admin/collections?action=CREATE&name=test2&numShards=2'
+    ```
+3) Check which node doesn't have replica of the collection. (in the following sample solr3 is "empty")<br /> 
+    ```json 
+      {"responseHeader":{
+          "status":0,
+          "QTime":8727},
+        "success":{
+          "solr1:8983_solr":{
+            "responseHeader":{
+              "status":0,
+              "QTime":6994},
+            "core":"test2_shard1_replica_n1"},
+          "solr2:8983_solr":{
+            "responseHeader":{
+              "status":0,
+              "QTime":7108},
+            "core":"test2_shard2_replica_n2"}}
+    ```
+4) Switch to client2@EXAMPLE.COM, pass: restrict (<- this user doesn't have any rights on newly created collection)
+    ```shell script
+    kinit client2@EXAMPLE.COM
+    ```
+5) Send a request to a node which has replica shall result 403
+    ```shell script
+    curl -i --negotiate -u : 'http://solr1:8983/solr/test2/select?q=*:*'
+    ```
+6) Send a request to the node which doesn't have a replica will result 200 and search response
+    ```shell script
+    curl -i --negotiate -u : 'http://solr3:8983/solr/test2/select?q=*:*'
+    ```
